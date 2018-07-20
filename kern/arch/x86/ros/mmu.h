@@ -68,6 +68,8 @@
 #define FL_RSVD_1	0x00000002	// These 1s must be 1, rflags |= this
 #define FL_RSVD_0	0x003f7fd7	// These 0s must be 0, rflags &= this
 
+#define MXCSR_RSVD_0	0xffff	// These 0s must be 0, mxcsr &= this
+
 // Page fault error codes
 #define FEC_PR		0x1	// Page fault caused by protection violation
 #define FEC_WR		0x2	// Page fault caused by a write

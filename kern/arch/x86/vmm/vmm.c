@@ -173,6 +173,10 @@ int vmm_poke_guest(struct proc *p, int guest_pcoreid)
 	return 0;
 }
 
+// XXX what is this gpc_id is negative?
+// 		userspace controls this number, then we could fail
+// 		was going with negative numbers since we use that often for coreid.
+// 		can also handle in proc_secure_vmtf
 struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
 {
 	struct guest_pcore **array;

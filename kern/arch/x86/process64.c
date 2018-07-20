@@ -275,6 +275,8 @@ static void proc_secure_hwtf(struct hw_trapframe *tf)
 {
 	enforce_user_canon(&tf->tf_gsbase);
 	enforce_user_canon(&tf->tf_fsbase);
+	enforce_user_canon(&tf->tf_rip);
+	enforce_user_canon(&tf->tf_rsp);
 	/* GD_UD is the user data segment selector in the GDT, and
 	 * GD_UT is the user text segment selector (see inc/memlayout.h).
 	 * The low 2 bits of each segment register contains the
@@ -288,6 +290,8 @@ static void proc_secure_hwtf(struct hw_trapframe *tf)
 	 * are also virtual-8086 mode stuff.  Supposedly NT is settable by
 	 * userspace, but there's no good reason for it.  Rather be paranoid. */
 	tf->tf_rflags &= ~(FL_IOPL_MASK | FL_VM | FL_NT | FL_VIF | FL_VIP);
+	tf->tf_rflags |= FL_RSVD_1;
+	tf->tf_rflags &= FL_RSVD_0;
 	x86_hwtf_clear_partial(tf);
 }
 
@@ -296,6 +300,10 @@ static void proc_secure_swtf(struct sw_trapframe *tf)
 	enforce_user_canon(&tf->tf_gsbase);
 	enforce_user_canon(&tf->tf_fsbase);
 	enforce_user_canon(&tf->tf_rip);
+	enforce_user_canon(&tf->tf_rsp);
+	/* The kernel doesn't actually load the mxcsr or the fpucw, but we can still
+	 * sanitize it in case we ever do load it. */
+	tf->tf_mxcsr &= MXCSR_RSVD_0;
 	x86_swtf_clear_partial(tf);
 }
 
@@ -306,6 +314,24 @@ static void proc_secure_vmtf(struct vm_trapframe *tf)
 	 * other parts of the kernel rely on. */
 	tf->tf_rflags |= FL_RSVD_1;
 	tf->tf_rflags &= FL_RSVD_0;
+
+	// XXX do rsp and rip need to be canonical?
+	//
+	// what about other admin shit we might use during popping, such as
+	// 		trap_inject?
+	// 		guest_pcoreid?
+	//
+	// 		if guest_pcoreid is bad, it'll reflect it to the 2LS
+	// 			and thus not run
+	// 			careful of -1
+	// 			this also covers not having VM support
+	// 		check all the tf fields we use in pop_vmtf
+	//
+	// 		mention targetted fuzzing to dmitry
+	// also, will we fail if they give us a vmtf with virt disabled?
+	//
+	// (also, RCU deadlock and alarm stuff)
+
 	x86_vmtf_clear_partial(tf);
 }
 
@@ -324,8 +350,13 @@ void proc_secure_ctx(struct user_context *ctx)
 	default:
 		/* If we aren't another ctx type, we're assuming (and forcing) a HW ctx.
 		 * If this is somehow fucked up, userspace should die rather quickly. */
-		ctx->type = ROS_HW_CTX;
-		proc_secure_hwtf(&ctx->tf.hw_tf);
+		//ctx->type = ROS_HW_CTX;
+		//proc_secure_hwtf(&ctx->tf.hw_tf);
+
+		ctx->type = ROS_VM_CTX;
+		print_user_ctx(ctx);
+		proc_secure_vmtf(&ctx->tf.vm_tf);
+		print_user_ctx(ctx);
 	}
 }
 
